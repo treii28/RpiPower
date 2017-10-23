@@ -17,10 +17,6 @@
 #include <RpiPower.h>
 #endif
 
-#ifndef RpiRelays_h
-#include "RpiRelays.h"
-#endif
-
 #define UI_VOFFSET 36
 #define UI_HSPACING 5
 #define UI_SWWID 10
@@ -28,12 +24,28 @@
 
 class RPUISSD1306 {
 public:
+    RpiPower *rpRelays[6];
+
     // constructors
-    RPUISSD1306(U8GLIB_SSD1306_128X64 *_u, RpiRelays *_r);
+    RPUISSD1306(U8GLIB_SSD1306_128X64 *_u);
+
+    void defineRelay(uint8_t rId, uint8_t pin, uint8_t id1, uint8_t id2, const char *id, const char *name) {
+        rpRelays[rId] = new RpiPower(pin, id1, id2, id, name);
+    };
+
+    void setRelay(uint8_t rId, RpiPower *_rPwr) {
+        rpRelays[rId] = _rPwr;
+        rpRelays[rId]->setDefined();
+    };
+    void clearRelay(uint8_t rId);
+    uint8_t countRelays();
 
     // public methods
-    int setSelected(uint8_t _s);
+    void setSelected(uint8_t _s) { _selected = _s; };
+    int getSelected(uint8_t _s) { return _selected; };
     void changeSelected(uint8_t _s);
+
+    String getInfoJSON();
 
     void drawSwitchNum(uint8_t swNum, int8_t state);
 
@@ -45,6 +57,8 @@ public:
     void buttonPressed();
     void buttonReleased();
 
+    void toggleRelay(uint8_t _r);
+
     void clearUpper();
     void clearLower();
     void clearSwitchArea(uint8_t sNum);
@@ -52,9 +66,10 @@ public:
 private:
     // private variables
     U8GLIB_SSD1306_128X64 *_u8g;
-    RpiRelays *_rpRelays;
+    uint8_t _selected = 0;
 
     // private methods
+    void shiftRelays();
     void u8gDef();
 
     uint8_t getSwHOffset(uint8_t sNum);

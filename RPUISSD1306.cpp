@@ -19,76 +19,108 @@
 #endif
 
 // constructors
-RPUISSD1306::RPUISSD1306(U8GLIB_SSD1306_128X64 *_u, RpiRelays *_r) {
+RPUISSD1306::RPUISSD1306(U8GLIB_SSD1306_128X64 *_u) {
     _u8g = _u;
     u8gDef();
     _u8g->begin();
-
-    _rpRelays = _r;
 }
 
 // public methods
 
-void RPUISSD1306::changeSelected(uint8_t _s) {
-    // remove any current selection indicator
-    renderSwitchSelected( _rpRelays->selected, 0 );
-    renderSelectedInfo(_rpRelays->selected, 0);
-    _rpRelays->setSelected(_s);
-    renderSwitchSelected(_rpRelays->selected, 1);
-    renderSelectedInfo(_rpRelays->selected, 1);
+void RPUISSD1306::clearRelay(uint8_t rId) {
+    rpRelays[rId] = new RpiPower();
+    shiftRelays();
 }
 
+uint8_t RPUISSD1306::countRelays() {
+    uint8_t _i;
+    uint8_t cnt = 0;
+    for(_i = 0; _i<6; _i++) {
+        if(rpRelays[_i]->isDefined()) {
+            cnt++;
+        }
+    }
+    return cnt;
+}
+void RPUISSD1306::shiftRelays() {
+    uint8_t _i;
+    int8_t last = -1;
+    for(_i=0;_i<6;_i++) {
+        if(rpRelays[_i]->isDefined()) {
+            if(last != -1) {
+                rpRelays[last] = rpRelays[_i];
+                rpRelays[last] = new RpiPower();
+                last++;
+            }
+        } else {
+            last = _i;
+        }
+    }
+}
+
+void RPUISSD1306::changeSelected(uint8_t _s) {
+    // remove any current selection indicator
+    renderSwitchSelected(_selected, 0);
+    renderSelectedInfo(_selected, 0);
+    setSelected(_s);
+    renderSwitchSelected(_selected, 1);
+    renderSelectedInfo(_selected, 1);
+}
+
+String RPUISSD1306::getInfoJSON() {
+    String output = "{";
+    output += "count:" + String(countRelays()) + ",selected:" + String(_selected);
+
+    output += ",relays:[";
+    uint8_t _i;
+    uint8_t _cnt = 0;
+    for (_i = 0; _i < 6; _i++) {
+        if (rpRelays[_i]->isDefined()) {
+            _cnt++;
+            output += (_cnt > 1) ? "," : "";
+            output += rpRelays[_i]->getInfoJSON();
+        }
+    }
+
+    output += "]}";
+    return output;
+}
+
+
 void RPUISSD1306::drawTest() {
-    Serial.println("calling firstpage");
     _u8g->firstPage();
     do {
-        Serial.println("writing test message");
         _u8g->setColorIndex(1);
         _u8g->setFont(u8g_font_timB10);
         _u8g->drawStr(5, 32, "starting...");
 
-        Serial.println("drawing divider");
         _u8g->drawLine(5, 28, 123, 28);
-        Serial.println("finished");
     } while( _u8g->nextPage() );
 
 }
 
 void RPUISSD1306::drawScreen() {
-    Serial.println("calling firstPage");
     _u8g->firstPage();
     do {
-        Serial.println("writing selected Info");
-        renderSelectedInfo(_rpRelays->selected, 1);
-        Serial.println("drawing divider");
+        renderSelectedInfo(_selected, 1);
         renderDivider(1);
-        Serial.println("drawing button Outer");
         renderButtonOuter(1);
-        Serial.println("drawing button inner");
         renderButtonInner(false, 1);
-        Serial.println("calling drawSwitches");
         drawSwitches();
-        Serial.println("finished");
+        renderButtonOuter(1);
+        renderButtonInner(false, 1);
     } while( _u8g->nextPage() );
 };
 
 void RPUISSD1306::drawSwitches() {
-    Serial.println("calling clearLower");
     clearLower();
     uint8_t i;
-    uint8_t rc = sizeof(_rpRelays->relays);
-    Serial.println("relay count: " + String(_rpRelays->countRelays()));
-    for(i=0; i<rc; i++) {
-        if(_rpRelays->relays[i].isDefined()) {
-            Serial.println("mini switch render for relay " + String(i));
-            Serial.println("drawing frame");
+    for(i=0; i<6; i++) {
+        if(rpRelays[i]->isDefined()) {
             renderSwitchFrame(i, 1);
-            Serial.println("drawing toggle");
-            renderSwitchToggle(i, _rpRelays->relays[i].getRelayState(), 1);
-            Serial.println("drawing label");
+            renderSwitchToggle(i, rpRelays[i]->getRelayState(), 1);
             renderSwitchLabel(i, 1);
-            if(i == _rpRelays->selected) {
-                Serial.println("marking as selected");
+            if(i == _selected) {
                 renderSwitchSelected(i, 1);
             }
         } else {
@@ -105,6 +137,12 @@ void RPUISSD1306::buttonReleased() {
     renderButtonInner(false, 1);
 }
 
+void RPUISSD1306::toggleRelay(uint8_t _r) {
+    rpRelays[_r]->toggleRelay();
+    renderSelectedInfo(_selected, 0);
+    renderSwitchToggle(_r, rpRelays[_r]->getRelayState(), 1);
+    renderSelectedInfo(_selected, 1);
+}
 void RPUISSD1306::clearUpper() {
     clearRectangle(0,0,127,27);
 }
@@ -132,17 +170,14 @@ void RPUISSD1306::u8gDef() {
 uint8_t RPUISSD1306::getSwHOffset(uint8_t sNum) {
     return UI_HSPACING + (sNum * (UI_SWWID + UI_HSPACING));
 }
+
 void RPUISSD1306::renderSelectedInfo(uint8_t sNum, uint8_t ci) {
     _u8g->setColorIndex((ci == 1) ? 1 : 0);
     _u8g->setFont(u8g_font_timB10);
 
     delay(1000);
-    char _status[20];
-    _rpRelays->relays[sNum].copyName(_status);
 
-    String statusMessage = String(_status) + " is ";
-    statusMessage += (_rpRelays->relays[sNum].getRelayState()) ? "'on'" : "'off'";
-    Serial.println("status message: " + statusMessage);
+    String statusMessage = rpRelays[sNum]->getStatus();
     _u8g->drawStr(4, 18, statusMessage.c_str());
 }
 
@@ -153,30 +188,30 @@ void RPUISSD1306::renderDivider(uint8_t ci) {
 
 void RPUISSD1306::renderSwitchSelected(uint8_t sNum, uint8_t ci) {
     _u8g->setColorIndex((ci == 1) ? 1 : 0);
-    _u8g->drawFrame(getSwHOffset(sNum) - 2, UI_VOFFSET, UI_SWWID + 4, 10);
+    _u8g->drawFrame(getSwHOffset(sNum) - 2, UI_VOFFSET - 2, UI_SWWID + 4, 10);
 }
 
 void RPUISSD1306::renderSwitchLabel(uint8_t sNum, uint8_t ci) {
     _u8g->setColorIndex((ci == 1) ? 1 : 0);
     _u8g->setFont(u8g_font_5x7);
     char id[3];
-    _rpRelays->relays[sNum].copyId(id);
-    _u8g->drawStr(UI_VOFFSET + 8, getSwHOffset(sNum), id);
+    rpRelays[sNum]->copyId(id);
+    _u8g->drawStr(getSwHOffset(sNum), UI_VOFFSET + 6, id);
 }
 
 void RPUISSD1306::renderSwitchFrame(uint8_t sNum, uint8_t ci) {
     _u8g->setColorIndex((ci == 1) ? 1 : 0);
-    _u8g->drawFrame(getSwHOffset(sNum), UI_VOFFSET + 8, UI_SWWID, UI_SWHIG);
+    _u8g->drawFrame(getSwHOffset(sNum), UI_VOFFSET + 10, UI_SWWID, UI_SWHIG);
 }
 
 void RPUISSD1306::renderSwitchToggle(uint8_t sNum, bool state, uint8_t ci) {
     // render top
     _u8g->setColorIndex((state && (ci == 1)) ? 1 : 0);
-    _u8g->drawBox(getSwHOffset(sNum) + 2, UI_VOFFSET + 10, UI_SWWID - 4, UI_SWWID - 4);
+    _u8g->drawBox(getSwHOffset(sNum) + 2, UI_VOFFSET + 12, UI_SWWID - 4, UI_SWWID - 4);
 
     // render bottom
     _u8g->setColorIndex((!state && (ci == 1)) ? 1 : 0);
-    _u8g->drawFrame(getSwHOffset(sNum) + 2, UI_VOFFSET + (6 + UI_SWHIG), UI_SWWID - 4, UI_SWWID - 4);
+    _u8g->drawFrame(getSwHOffset(sNum) + 2, UI_VOFFSET + (2 + UI_SWHIG), UI_SWWID - 4, UI_SWWID - 4);
 }
 
 void RPUISSD1306::renderButtonInner(bool pressed, uint8_t ci) {

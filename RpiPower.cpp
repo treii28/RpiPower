@@ -13,25 +13,36 @@
 #endif
 
 #include "RpiPower.h"
+RpiPower::RpiPower() {
+    initRelay(0, false);
+    _idc1 = 0b00000000;
+    _idc2 = 0b00000000;
+    setUndefined();
+}
 
 RpiPower::RpiPower(uint8_t pin, uint8_t id1, uint8_t id2, const char *id, const char *name) {
     initRelay(pin, false);
     _idc1 = id1;
     _idc2 = id2;
     strncpy(_id, id, 2);
+    _id[2] = 0;
     strncpy(_name, name, 8);
+    _name[8] = 0;
     setDefined();
 }
 
-String RpiPower::getInfoJson() {
-    String relInfo = "{";
-    relInfo += "{pin:" + String(_pin) + ",idc1:" + String(_idc1) + ",idc2:" + String(_idc2);
-    relInfo += ",id:\"" + String(_id) + "\",name:\"" + String(_name) + "\",state:";
-    relInfo += (_relayState) ? "1" : "0";
-    relInfo += "}";
+String RpiPower::getInfoJSON() {
+    String relInfo = "{pin:" + String(_pin) + ",idc1:" + String(_idc1) + ",idc2:" + String(_idc2) +
+            ",id:\"" + String(_id) + "\",name:\"" + String(_name) + "\",state:" + String(_relayState) + "}";
 
     return relInfo;
 };
+
+String RpiPower::getStatus() {
+    String _status = String(_name) + " is ";
+    _status += (getRelayState()) ? "'on'" : "'off'";
+    return _status;
+}
 
 uint8_t RpiPower::getStatusDigit() {
     return 0b01100011;

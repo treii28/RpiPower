@@ -19,13 +19,14 @@
 
 class RpiPower {
 public:
+    RpiPower();
     RpiPower(uint8_t pin, uint8_t id1, uint8_t id2, const char * id, const char *name);
 
     void setPin(uint8_t p)      { _pin = p; };
     uint8_t getPin()            { return _pin; };
 
-    void setId(const char *i)   { strncpy(_id, i, 2); };
-    void copyId(char *i)        { strncpy(i, (char*)_id, 2); };
+    void setId(const char *i)   { strncpy(_id, i, 2); _id[2] = 0; };
+    void copyId(char *i)        { strncpy(i, (char*)_id, 2); i[2] = 0; };
 
     void setIdc1(uint8_t d)     { _idc2 = d; };
     uint8_t getIdc1()           { return _idc1; };
@@ -33,10 +34,11 @@ public:
     void setIdc2(uint8_t d)     { _idc2 = d; };
     uint8_t getIdc2()           { return _idc2; };
 
-    void setName(const char *n) { strncpy(_name, n, 8); };
-    void copyName(char *n)      { strncpy(n, _name, 8); };
+    void setName(const char *n) { strncpy(_name, n, 8); _name[8] = 0; };
+    void copyName(char *n)      { strncpy(n, _name, 8); n[8] = 0; };
 
-    String getInfoJson();
+    String getInfoJSON();
+    String getStatus();
 
     uint8_t getStatusDigit();
 
@@ -55,12 +57,12 @@ public:
     void setUndefined() { _def = false; };
     bool isDefined() { return _def; };
 private:
-    bool _def = true;
+    bool _def = false;
     uint8_t _pin;      // relay pin
     uint8_t _idc1;     // first character id to display
     uint8_t _idc2;     // second character id to display
-    char _id[3];
-    char _name[9];     // user friendly name
+    char _id[3] = {0};
+    char _name[9] = {0};     // user friendly name
     bool _relayState;
 };
 
